@@ -1,1 +1,8 @@
 .venv
+.DS_Store
+
+*.zip
+
+*.csv
+
+*.pdf

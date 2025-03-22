@@ -1,9 +1,9 @@
 import json
 import csv
-import collections
+# import collections
 import heapq
-import matplotlib.pyplot as plt
-import pandas as pd
+# import matplotlib.pyplot as plt
+# import pandas as pd
 
 def load_data(file_path):
     """讀取JSON檔案並返回數據"""
@@ -28,12 +28,10 @@ def build_adjacency_matrix(data):
     for link in links:
         source = link['source']
         target = link['target']
-        value = link['value']
-        adj_matrix[source][target] = value
-        adj_matrix[target][source] = value  # 無向圖需要對稱
+        adj_matrix[source][target] = 1
+        adj_matrix[target][source] = 1  # 無向圖需要對稱
     
     return adj_matrix, node_names
-
 
 def save_matrix_to_csv(adj_matrix, node_names, file_path):
     """使用原生方法將鄰接矩陣儲存成CSV檔案，不包含標頭"""
@@ -83,48 +81,49 @@ def shortest_path(graph, start):
     
     return dist, pred, paths
 
-def calculate_dependency(graph, source, distances, predecessors, path_counts):
+def calculate_dependency(graph, s, distances, predecessors, path_counts):
     """計算一個節點對其他節點對的依賴性"""
-    # 初始化依賴值
-    dependency = {node: 0 for node in range(len(graph))}
-    
-    # 按距離從遠到近的順序處理節點
-    nodes = sorted([(distances[node], node) for node in range(len(graph)) if node != source], reverse=True)
-    
-    for _, node in nodes:
-        # 計算節點的依賴性
-        for pred in predecessors[node]:
-            dependency[pred] += (path_counts[pred] / path_counts[node]) * (1 + dependency[node])
-    
+    n = len(graph)
+
+    # dependency[t][v] 用於儲存 s 到 t 經過 v 的最短路徑數量
+    dependency = [[ 0 for _ in range(n + 1)] for _ in range(n)] 
+
+    for t in range(n):
+        dependency[t][n] = path_counts[t]
+
+        for pred in predecessors[t]:
+            if pred == s or pred == t:
+                continue
+
+            dependency[t][pred] += path_counts[pred]
     return dependency
 
 def calculate_betweenness_centrality(adj_matrix):
     """計算 betweenness centrality"""
     n = len(adj_matrix)
-    betweenness = {node: 0 for node in range(n)}
+    # path_matrix[s][t][v] 用於儲存 s 到 t 經過 v 的最短路徑數量
+    path_matrix = [] 
     
-    # 對每個節點
     for s in range(n):
         # 計算最短路徑
         distances, predecessors, path_counts = shortest_path(adj_matrix, s)
+        
         # 計算依賴值
         dependency = calculate_dependency(adj_matrix, s, distances, predecessors, path_counts)
         
-        # 累加betweenness
-        for v in range(n):
-            if v != s:
-                betweenness[v] += dependency[v]
-    
-    # 歸一化 (對於無向圖除以2)
-    for node in betweenness:
-        betweenness[node] /= 2
-    
-    # 歸一化為[0,1]的範圍
-    if n > 2:
-        normalization_factor = (n-1) * (n-2)
-        for node in betweenness:
-            betweenness[node] /= normalization_factor
-    
+        path_matrix.append(dependency)
+
+
+    betweenness = [ 0 for _ in range(n)]
+
+    # 計算中介中心性
+    for v in range(n):
+        for s in range(n):
+            for t in range(n):
+                if path_matrix[s][t][n] == 0:
+                    continue
+                betweenness[v] += path_matrix[s][t][v] / path_matrix[s][t][n]
+        
     return betweenness
 
 def get_top_k_betweenness(adj_matrix,k = 10):
@@ -135,7 +134,7 @@ def get_top_k_betweenness(adj_matrix,k = 10):
     betweenness = calculate_betweenness_centrality(adj_matrix)
     
     # 將結果與節點名稱關聯
-    result = [(node, value) for node, value in betweenness.items()]
+    result = [(node, value) for node, value in enumerate(betweenness)]
     
     # 根據中介中心性排序
     result.sort(key=lambda x: x[1], reverse=True)
@@ -143,6 +142,14 @@ def get_top_k_betweenness(adj_matrix,k = 10):
     # 返回前k個結果
     return result[:k]
     
+
+def save_betweenness_to_csv(betweenness, file_path):
+    """將中介中心性儲存為CSV檔案"""
+    with open(file_path, 'w', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        for node, value in betweenness:
+            csv_writer.writerow([node, f"{value:.2f}"])
+    print(f"中介中心性已成功儲存至 {file_path}")
 
 def main():
     # 讀取資料
@@ -162,14 +169,19 @@ def main():
     for name, value in top_10:
         print(f"{name}: {value:.6f}")
     
+    # 將中介中心性儲存為CSV
+    save_betweenness_to_csv(top_10, "/Users/ponywen/Documents/projects/SMA/hw_1/rank.csv")
+
     # 視覺化前10名角色的中介中心性
-    plt.figure(figsize=(12, 6))
-    plt.barh(top_10[1][::-1], top_10[0][::-1])
-    plt.xlabel('中介中心性 (Betweenness Centrality)')
-    plt.title('Top 10')
-    plt.tight_layout()
-    plt.savefig('betweenness_centrality.png')
-    plt.show()
+    # a = [str(x[0]) for x in top_10[::-1]]
+    # b = [x[1] for x in top_10[::-1]]
+    # plt.figure(figsize=(12, 6))
+    # plt.barh(a,b)
+    # plt.xlabel('中介中心性 (Betweenness Centrality)')
+    # plt.title('Top 10')
+    # plt.tight_layout()
+    # plt.savefig('betweenness_centrality.png')
+    # plt.show()
 
 if __name__ == "__main__":
     main()
