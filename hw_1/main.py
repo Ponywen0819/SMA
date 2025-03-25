@@ -1,9 +1,5 @@
 import json
 import csv
-# import collections
-import heapq
-# import matplotlib.pyplot as plt
-# import pandas as pd
 
 def load_data(file_path):
     """讀取JSON檔案並返回數據"""
@@ -43,88 +39,67 @@ def save_matrix_to_csv(adj_matrix, node_names, file_path):
     print(f"鄰接矩陣已成功儲存至 {file_path}")
 
 def shortest_path(graph, start):
-    """使用Dijkstra算法計算從一個節點到其他所有節點的最短路徑"""
-    # 初始化距離、前驅節點和路徑數量
-    dist = {node: float('infinity') for node in range(len(graph))}
-    pred = {node: [] for node in range(len(graph))}
-    paths = {node: 0 for node in range(len(graph))}
-    
-    dist[start] = 0
-    paths[start] = 1
-    
-    # 優先隊列
-    pq = [(0, start)]
-    
-    while pq:
-        current_dist, current = heapq.heappop(pq)
-        
-        # 如果已經找到更短的路徑，則跳過
-        if current_dist > dist[current]:
-            continue
-        
-        # 探索相鄰節點
-        for neighbor in range(len(graph)):
-            if graph[current][neighbor] > 0:  # 存在邊
-                weight = graph[current][neighbor]
-                distance = current_dist + 1/weight  # 權重越大，距離越短
-                
-                # 如果找到更短的路徑
-                if distance < dist[neighbor]:
-                    dist[neighbor] = distance
-                    pred[neighbor] = [current]
-                    paths[neighbor] = paths[current]
-                    heapq.heappush(pq, (distance, neighbor))
-                # 如果找到相同長度的路徑
-                elif distance == dist[neighbor]:
-                    pred[neighbor].append(current)
-                    paths[neighbor] += paths[current]
-    
-    return dist, pred, paths
+    """使用 BFS 計算最短路徑"""
+    n = len(graph)
+    stack = []
 
-def calculate_dependency(graph, s, distances, predecessors, path_counts):
+    distances = [-1 for _ in range(n)]
+    distances[start] = 0
+
+    path_counts = [0 for _ in range(n)]
+    path_counts[start] = 1
+    
+    predecessors = [[] for _ in range(n)]
+    
+    queue = [start]
+    while queue:
+        current = queue.pop(0)
+        stack.append(current)
+
+        for neighbor, connected in enumerate(graph[current]):
+            if connected == 0:
+                continue
+            if distances[neighbor] == -1:
+                distances[neighbor] = distances[current] + 1
+                queue.append(neighbor)
+            if distances[neighbor] == distances[current] + 1:
+                path_counts[neighbor] += path_counts[current]
+                predecessors[neighbor].append(current)
+    
+    return distances, predecessors, path_counts, stack
+
+def calculate_dependency(graph, stack, predecessors, path_counts):
     """計算一個節點對其他節點對的依賴性"""
     n = len(graph)
 
-    # dependency[t][v] 用於儲存 s 到 t 經過 v 的最短路徑數量
-    dependency = [[ 0 for _ in range(n + 1)] for _ in range(n)] 
-
-    for t in range(n):
-        dependency[t][n] = path_counts[t]
-
-        for pred in predecessors[t]:
-            if pred == s or pred == t:
-                continue
-
-            dependency[t][pred] += path_counts[pred]
+    dependency = [0 for _ in range(n)]
+    while stack:
+        current = stack.pop()
+        for predecessor in predecessors[current]:
+            dependency[predecessor] += path_counts[predecessor] / path_counts[current] * (1 + dependency[current])
+    
     return dependency
 
 def calculate_betweenness_centrality(adj_matrix):
     """計算 betweenness centrality"""
     n = len(adj_matrix)
-    # path_matrix[s][t][v] 用於儲存 s 到 t 經過 v 的最短路徑數量
-    path_matrix = [] 
+    
+    betweenness = [ 0 for _ in range(n)]
     
     for s in range(n):
         # 計算最短路徑
-        distances, predecessors, path_counts = shortest_path(adj_matrix, s)
+        _, predecessors, path_counts, stack = shortest_path(adj_matrix, s)
         
         # 計算依賴值
-        dependency = calculate_dependency(adj_matrix, s, distances, predecessors, path_counts)
-        
-        path_matrix.append(dependency)
+        dependency = calculate_dependency(adj_matrix, stack, predecessors, path_counts)
 
+        # 累加依賴值
+        for v in range(n):
+            if v == s:
+                continue
+            betweenness[v] += dependency[v]
 
-    betweenness = [ 0 for _ in range(n)]
-
-    # 計算中介中心性
-    for v in range(n):
-        for s in range(n):
-            for t in range(n):
-                if path_matrix[s][t][n] == 0:
-                    continue
-                betweenness[v] += path_matrix[s][t][v] / path_matrix[s][t][n]
-        
-    return betweenness
+    return [i/2 for i in betweenness]
 
 def get_top_k_betweenness(adj_matrix,k = 10):
     """計算中介中心性並返回前k名的節點"""

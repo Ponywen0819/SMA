@@ -2,7 +2,6 @@
 
 ## Library
 
-- heapq
 - csv
 - json
 
@@ -13,7 +12,6 @@
 
 ## betweenness value
 
-1. 對所有 node 進行尋訪
-   1. 將本次迭代的 node 設定為 source，利用 Dijkstra 計算最小路徑
-   2. 建構 path\*matrix[s][t][v]，其意義為 $\sigma_{st}(v)$
-   3. 尋訪 path_matrix[s][t] ，將相應數值相加，得出 betweenness
+1. 對於每個起點 s，使用 BFS 計算到其他所有節點的最短路徑數量
+2. 依照 Brandes 公式計算節點間的依賴關係
+3. 將所有依賴值相加
