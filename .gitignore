@@ -6,3 +6,7 @@
 *.csv
 
 *.pdf
+
+final/.env
+
+final/__pycache__/
